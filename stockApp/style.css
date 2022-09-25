@@ -1,0 +1,15 @@
+.listItem{
+    color: grey;
+}
+.listItem:hover{
+    background-color: greenyellow;
+}
+.listItemHeader{
+    color: green;
+}
+.stockSearchResults{
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    list-style-type:none;
+}

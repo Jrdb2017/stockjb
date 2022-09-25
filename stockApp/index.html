@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Stock Momentum Analyzer</title>
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl" crossorigin="anonymous">
+	<link rel="stylesheet" href="./style.css">
+</head>
+  <body>
+	<nav class="navbar navbar-expand-lg bg-success">
+		<div class="container-fluid">
+		  <span class="navbar-brand mb-0 h1"> Stock Momentum Analyzer</span>
+		  <form class="d-flex">
+		  		<input class="form-control me-2"  id="stockSearch" placeholder="Look up a stock"  oninput="populateStockList(this.value)" onchange="populateStockList(this.value)" >
+				<div id="hover" style="display: none;position: absolute; top:50px;  z-index:10; width:220px;padding-top: 5px;box-sizing: border-box;border-radius: 2px;border-color: grey;border-style: solid;border-width: 1px;box-shadow: 0 2px 4px rgb(0 0 0 / 20%);background-color: white;">
+					<ul id="stockResults" class = "stockSearchResults">
+
+					</ul>
+				</div>
+				 <button class="btn btn-light" type="button" onClick="Search()">Search</button> 
+			</form>
+		</div>
+	  </nav>
+	<div class="container">
+		<div class="row">
+			<div class ="col-sm">
+				<table class="table">
+					<tbody>
+						<tr>
+							<th>Symbol</th>
+						</tr>
+						<tr>
+							<th>Company Name</th>
+						</tr>
+						<tr>
+							<th>Current Price</th>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+	
+			<div class ="col-sm">
+				<table class="table">
+					<tbody>
+						<tr>
+							<th>Recent News</th>
+						</tr>
+						<tr>
+							<th></th>
+						</tr>
+						<tr>
+							<th></th>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<div class ="col-sm">
+				<button class="btn btn-success" type="button" onClick="ShowTrend()">Show Trend Lines</button>
+				<div>Trend Dates</div>
+			</div>
+		</div>
+		<div class="row">	
+			<svg id = "stock" width="1200" height="700"  viewBox="0 0 1200 700" preserveAspectRatio="xMidYMid meet"></svg>		 
+		</div>
+		<div class="row">
+				<svg id = "stochastic" width="1200" height="400" viewBox="0 0 1200 400" preserveAspectRatio="xMidYMid meet"></svg>
+		</div>
+		<div class="row">		
+			<svg id = "macd" width="1200" height="700" viewBox="0 0 1200 700" preserveAspectRatio="xMidYMid meet"></svg>
+		</div>
+		  </div>
+	</div>
+	
+	
+	
+	
+	<script src="https://d3js.org/d3.v6.js"></script>
+	<script src="./data.js" ></script>
+	<!-- <script src="./testData.js" ></script> -->
+	<script src="./stockChart.js" ></script>
+	<script src="./stochasticChart.js" ></script>
+	<script src="./macdChart.js" ></script>
+	<script>
+		//examples
+		// <!-- https://observablehq.com/@d3/d3-bisect -->
+		// <!-- http://jsfiddle.net/cuckovic/vKe67/ -->
+		// <!-- https://d19jftygre6gh0.cloudfront.net/larsenmtl/e3b8b7c2ca4787f77d78f58d41c3da91 -->
+		// <!-- https://www.d3-graph-gallery.com/graph/line_cursor.html -->
+		// https://jsfiddle.net/xrf1ro1a/
+		//data for search - yahoo api - https://rapidapi.com/apidojo/api/yahoo-finance1
+
+		//https://stackoverflow.com/questions/9400615/whats-the-best-way-to-make-a-d3-js-visualisation-layout-responsive  
+		
+	</script>
+	
+	<script>
+		//add chart legend and titles...
+		//add bargraph/histogram to macD
+		//figure our circle hover for stochastic and macD
+		let stockData;
+		let stochasticData;
+		let macdData;
+		let selectedDate = new Date(2021,2,1);
+		Date.prototype.addDays = function(days) {
+		   let d = new Date(this.valueOf());
+		   d.setDate(d.getDate() + days);
+		   return d;
+		}
+		
+		const stockChartSvg = d3.select('#stock');
+		const stockChart = stockChartSvg.append('g');
+		const stockChartWidth = +stockChartSvg.attr('width');
+		const stockChartHeight = +stockChartSvg.attr('height');
+		
+		const stochasticChartSvg = d3.select('#stochastic');
+		const stochasticChart = stochasticChartSvg.append('g');
+		const stochasticChartWidth = +stochasticChartSvg.attr('width');
+		const stochasticChartHeight = +stochasticChartSvg.attr('height');
+
+		const macdChartSvg = d3.select('#macd');
+		const macdChart = macdChartSvg.append('g');
+		const macdChartWidth = +macdChartSvg.attr('width');
+		const macdChartHeight = +macdChartSvg.attr('height');
+	
+
+			
+		
+		const setSelectedDate = d => {
+		//  console.log(d);
+		  selectedDate = d;
+		  render();
+		  return selectedDate;
+		};
+		const render = () =>{
+			const trendDates = MomentumDates(stockData,stochasticData,macdData);
+			stockChart.call(stockChartRender,{
+				selectedDate,
+				width:stockChartWidth,
+				height:stockChartHeight,
+				data:stockData,
+				stockPrice,
+				trendDates				
+			});
+			stochasticChart.call(stochasticChartRender,{
+				selectedDate,
+				width:stochasticChartWidth,
+				height:stochasticChartHeight,
+				data:stochasticData,
+				stockPrice,
+				trendDates
+			});
+			macdChart.call(macdChartRender,{
+				selectedDate,
+				width:macdChartWidth,
+				height:macdChartHeight,
+				data:macdData,
+				stockPrice,
+				trendDates
+			});
+			
+		};
+		var showTrend = false;
+		const ShowTrend = () =>{
+			showTrend = (showTrend)?false:true;
+			var lines = document.getElementsByClassName('trends');
+			for(var i = 0; i< lines.length; i++){
+				lines[i].style.opacity = showTrend*showTrend
+			}
+			render();
+		}
+		//make fucntion better or add circles everywhere...
+		const stockPrice = (date,data) =>{ //used on circle currently lol
+		    //var value;
+			//console.log(data)
+			var dateObject = new Date(date);
+			var formattedDate = dateObject.getFullYear() + '-' + (dateObject.getMonth()+1).toString().padStart(2, '0') + '-' + dateObject.getDate().toString().padStart(2, '0');
+			var i = data.findIndex(d=> d.date==formattedDate);
+			if(i < 0)
+			{//needs some refactoring but closer...
+			// if(dt.getDay() == 6 || dt.getDay() == 0) weekend? 
+			    var dateObjectL = dateObject.addDays(-2);
+				var dateObjectR = dateObject.addDays(2);
+				var dateL = dateObjectL.getFullYear() + '-' + (dateObjectL.getMonth()+1).toString().padStart(2, '0') + '-' + (dateObjectL.getDate()).toString().padStart(2, '0');
+				var dateR = dateObjectR.getFullYear() + '-' + (dateObjectR.getMonth()+1).toString().padStart(2, '0') + '-' + (dateObjectR.getDate()).toString().padStart(2, '0');
+				//console.log(dateL);
+				//console.log(dateR);
+				var dateLvalue = data.find(d=> d.date==dateL).value;
+				var dateRvalue = data.find(d=> d.date==dateR).value;
+				return (dateLvalue+dateRvalue)/2
+			}
+			else
+			{
+				console.log(data[i]);
+				return data[i].value;
+			}
+			
+		}
+		const MomentumDates = (stockData, stochasticData,macdData) =>{
+			var momentumDates = [];
+			let dyStochastic = [];
+			let sortedStochasticData = stochasticData.reverse();
+			for(var i = 1; i < 100; i++)
+			{
+			
+				var data = {
+				date: sortedStochasticData[i].date,
+				SlowD: sortedStochasticData[i].SlowD - sortedStochasticData[i-1].SlowD,  //parseFloat
+				SlowK: sortedStochasticData[i].SlowK - sortedStochasticData[i-1].SlowK
+					}
+				dyStochastic.push(data)
+			}
+
+			let dyStock = [];
+			let sortedStockData = stockData.reverse();
+			for(var i = 1; i < 100; i++)
+			{
+				
+				var data = {
+				date: sortedStockData[i].date,
+				value: sortedStockData[i].value - sortedStockData[i-1].value
+					}
+				dyStock.push(data)
+			}
+
+			let dyMacd = [];
+			let sortedMacDData = macdData.reverse();
+			for(var i = 1; i < 100; i++)
+			{
+			
+				var data = {
+				date: sortedMacDData[i].date,
+				MACD: sortedMacDData[i].MACD - sortedMacDData[i-1].MACD, //parseFloat
+				MACD_Signal: sortedMacDData[i].MACD_Signal - sortedMacDData[i-1].MACD_Signal
+					}
+				dyMacd.push(data)
+			}
+
+			for(var i = 0; i < 99; i++)
+			{
+				if(dyStock[i].value> 0 && dyStochastic[i].SlowD >0 && dyStochastic[i].SlowK >0 && dyMacd[i].MACD > 0 && dyMacd[i].MACD_Signal > 0)
+				{
+					momentumDates.push(dyStock[i].date);
+				}
+			}
+			return momentumDates;
+		}
+		const Search =()=> {
+			var symbol = document.getElementById("stockSearch").value;
+			SearchExecute(symbol);
+		} 
+		const SearchExecute = (symbol) =>Promise.all([loadStockData(symbol), loadStochasticData(symbol), loadMacDData(symbol)]).then((loadedData) => {
+			stockData = loadedData[0];
+			stochasticData = loadedData[1];
+			macdData = loadedData[2];
+			render();
+		});
+		SearchExecute("avgo");
+		//render();
+		
+	</script>
+  </body>
+</html>
